@@ -11,6 +11,7 @@ namespace Tripzzy\PaymentGateway;
 defined( 'ABSPATH' ) || exit;
 use Tripzzy\Core\Payment\PaymentGateways; // Base.
 use Tripzzy\Core\Helpers\MetaHelpers;
+use Tripzzy\Core\Helpers\Page;
 use Tripzzy\Core\Helpers\Settings;
 use Tripzzy\Core\Helpers\Trip;
 use Tripzzy\Core\Traits\SingletonTrait;
@@ -49,25 +50,50 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 		protected static $settings;
 
 		/**
+		 * Assets path.
+		 *
+		 * @var string
+		 */
+		private static $assets_url;
+
+		/**
 		 * Constructor.
 		 */
 		public function __construct() {
 			self::$payment_gateway_title = 'Getpay Payment';
 			self::$settings              = Settings::get();
-
+			self::$assets_url            = sprintf( '%sassets/', GETPAY_PAYMENT_URL );
 			// Add Settings Fields.
 			add_filter( 'tripzzy_filter_payment_gateways_args', array( $this, 'init_args' ) );
 
-			// Gateway Script.
-			add_filter( 'tripzzy_filter_gateway_scripts', array( $this, 'init_gateway_scripts' ) );
+			// Frontend.
+			add_action( 'wp_enqueue_scripts', array( $this, 'frontend_scripts' ), 100 );
 
 			// add it, if you need localized data for your gateway.
-			add_filter( 'tripzzy_filter_localize_variables', array( __CLASS__, 'localized_variables' ) );
-		}
+			add_filter( 'tripzzy_filter_localize_variables', array( $this, 'localized_variables' ) );
 
+			// Add Checkout div in checkout page.
+			add_action( 'tripzzy_checkout_after_submit_button', array( $this, 'add_checkout_div' ) );
+
+			add_shortcode(
+				'TRIPZZY_PAYMENT',
+				function () {
+					ob_start();
+					wp_enqueue_script( 'tripzzy-getpay-bundle' );
+					?>
+					<div id="checkout"></div>
+					<?php
+					$content = ob_get_contents();
+					ob_end_clean();
+					return $content;
+				}
+			);
+		}
 
 		/**
 		 * Payment gateway arguments.
+		 *
+		 * @internal Admin side.
 		 */
 		protected static function payment_gateway_args() {
 			$args = array(
@@ -130,18 +156,28 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 		}
 
 		/**
-		 * Gateway scripts arguments.
+		 * Tripzzy Getpay Frontend Script.
+		 *
+		 * @return void
 		 */
-		protected static function gateway_scripts() {
-			$data = self::geteway_data();
-			$args = array();
-			if ( ! empty( $data ) ) {
-
-				$key_id    = $config['key_id'] ?? ''; // Payment key to use if required to pass in checkout js.
-				$getpay_js = sprintf( '%sassets/getpay.js', GETPAY_PAYMENT_URL );
-				$args[]    = $getpay_js;
+		public function frontend_scripts() {
+			$settings = Settings::get();
+			wp_register_script( 'tripzzy-getpay-bundle', 'https://minio.finpos.global/getpay-cdn/webcheckout/v5/bundle.js', array(), '1.0.0', true );
+			if ( Page::is( 'checkout' ) ) {
+				wp_enqueue_script( 'tripzzy-getpay-custom', self::$assets_url . 'getpay.js', array( 'tripzzy-getpay-bundle' ), '1.0.0', true );
+				wp_enqueue_style( 'tripzzy-getpay-custom', self::$assets_url . 'getpay.css', array(), '1.0.0' );
 			}
-			return $args;
+		}
+
+		/**
+		 * Add div in Tripzzy Checkout page with id checkout.
+		 *
+		 * @return void
+		 */
+		public function add_checkout_div() {
+			?>
+			<div id="checkout" hidden></div>
+			<?php
 		}
 
 		/**
@@ -150,7 +186,7 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 		 * @param array $localized All localized variables.
 		 * @return array
 		 */
-		public static function localized_variables( $localized ) {
+		public function localized_variables( $localized ) {
 
 			$data = self::geteway_data();
 			if ( ! empty( $data ) ) {
@@ -171,6 +207,11 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 					'ins_key'  => $ins_key,
 					'opr_key'  => $opr_key,
 				);
+
+				$localized['gateway']['getpay_payment']['thankyou_page_url'] = Page::get_url( 'thankyou' );
+				// $thankyou_page_url = add_query_arg( 'tripzzy_key', $data['tripzzy_nonce'], $thankyou_page_url );
+				// $thankyou_page_url = add_query_arg( 'booking_id', $booking_id, $thankyou_page_url );
+				// $thankyou_page_url = apply_filters( 'tripzzy_filter_thankyou_page_url', $thankyou_page_url );
 			}
 
 			return $localized;

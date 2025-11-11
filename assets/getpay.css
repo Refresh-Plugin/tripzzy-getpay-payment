@@ -1,0 +1,9 @@
+iframe.step-up-iframe{position: relative !important; min-height: 712px;}
+
+.tripzzy-getpay-payment-element .parent-div{
+    padding: 0 !important;
+    display: flex !important;
+}
+.tripzzy-getpay-payment-element .business-details-container{
+    display: none !important;
+}
