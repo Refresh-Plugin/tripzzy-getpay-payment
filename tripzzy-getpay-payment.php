@@ -28,8 +28,9 @@ use Tripzzy\PaymentGateway\GetpayPayment;
 use Tripzzy\Core\Seeder\PageSeeder;
 use Tripzzy\Core\Helpers\Settings;
 use Tripzzy\Core\Helpers\MetaHelpers;
-
-define( 'GETPAY_PAYMENT_URL', plugin_dir_url( __FILE__ ) );
+define( 'TRIPZZY_GETPAY_PLUGIN_FILE', __FILE__ );
+define( 'TRIPZZY_GETPAY_ABSPATH', dirname( TRIPZZY_GETPAY_PLUGIN_FILE ) . '/' );
+define( 'TRIPZZY_GETPAY_PAYMENT_URL', plugin_dir_url( TRIPZZY_GETPAY_PLUGIN_FILE ) );
 
 add_action( 'plugins_loaded', 'getpay_payment_init' );
 add_filter(
@@ -50,7 +51,7 @@ function tripzzy_getpay_pages() {
 			'post_content'   => '<div id="checkout"></div>',
 			'post_content_6' => '<!-- wp:html --><div id="checkout"></div><!-- /wp:html -->',
 			'settings_key'   => 'payment_page_id',
-			'title'          => __( 'GetPay Payment Page', 'tripzzy-getpay-payment' ),
+			'title'          => __( 'Tripzzy GetPay Payment Page', 'tripzzy-getpay-payment' ),
 		),
 		// Payment Success.
 		array(
@@ -59,7 +60,7 @@ function tripzzy_getpay_pages() {
 			'post_content'   => '<div id="checkout"></div>',
 			'post_content_6' => '<!-- wp:html --><div id="checkout"></div><!-- /wp:html -->',
 			'settings_key'   => 'processing_page_id',
-			'title'          => __( 'GetPay Thank You/Processing Page', 'tripzzy-getpay-payment' ),
+			'title'          => __( 'Tripzzy GetPay Processing Page', 'tripzzy-getpay-payment' ),
 		),
 	);
 	return $pages;

@@ -62,7 +62,7 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 		public function __construct() {
 			self::$payment_gateway_title = 'Getpay Payment';
 			self::$settings              = Settings::get();
-			self::$assets_url            = sprintf( '%sassets/', GETPAY_PAYMENT_URL );
+			self::$assets_url            = sprintf( '%sassets/', TRIPZZY_GETPAY_PAYMENT_URL );
 			// Add Settings Fields.
 			add_filter( 'tripzzy_filter_payment_gateways_args', array( $this, 'init_args' ) );
 
@@ -77,6 +77,11 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 
 			// Add Checkout div in checkout page.
 			add_action( 'tripzzy_checkout_after_submit_button', array( $this, 'add_checkout_div' ) );
+
+			// Page Template.
+			add_filter( 'template_include', array( $this, 'template_include' ) );
+			// Add Query vers for processing/success page.
+			add_filter( 'query_vars', array( $this, 'query_vars' ) );
 
 			add_shortcode(
 				'TRIPZZY_PAYMENT',
@@ -259,9 +264,9 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 					wp_enqueue_style( 'tripzzy-getpay-custom', self::$assets_url . 'getpay.css', array(), '1.0.0' );
 				}
 
-				$payment_page_id    = $settings['payment_page_id'] ?? 0;
-				$processing_page_id = $settings['processing_page_id'] ?? 0;
-				if ( $payment_page_id ) {
+				$payment_page_id    = (int) $settings['payment_page_id'] ?? 0;
+				$processing_page_id = (int) $settings['processing_page_id'] ?? 0;
+				if ( $payment_page_id === $current_page_id ) {
 					wp_enqueue_script( 'tripzzy-getpay-bundle' );
 				}
 			}
@@ -276,6 +281,75 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 			?>
 			<div id="checkout" hidden></div>
 			<?php
+		}
+
+		/**
+		 * Add Template For Page.
+		 *
+		 * @return void
+		 */
+		public function template_include( $template ) {
+			if ( $this->is_page( 'processing' ) ) {
+				$page_template = $this->get_template_file( 'processing.php' );
+				if ( $page_template ) {
+					return $page_template;
+				}
+			}
+			return $template;
+		}
+
+		public function get_template_file( $template_name, $args = array() ) {
+			$template_path = apply_filters( 'tripzzy_filter_getpay_template_path', 'tripzzy-getpay-payment/' );
+			$default_path  = sprintf( '%1$stemplates/', TRIPZZY_GETPAY_ABSPATH );
+
+			// Look templates in theme first.
+			$template = locate_template(
+				array(
+					trailingslashit( $template_path ) . $template_name,
+					$template_name,
+				),
+				false,
+				true,
+				$args
+			);
+
+			if ( ! $template ) { // Load from the plugin if the file is not in the theme.
+				$template = $default_path . $template_name;
+			}
+			if ( file_exists( $template ) ) {
+				return $template;
+			}
+			return false;
+		}
+
+		public function query_vars( $qvars ) {
+			$qvars[] = 'token';
+			return $qvars;
+		}
+
+		/**
+		 * To check getpay page.
+		 *
+		 * @param string $slug Page slug to check.
+		 */
+		public function is_page( $slug = '' ) {
+			if ( ! $slug ) {
+				return;
+			}
+			$settings        = self::$settings;
+			$current_page_id = get_the_ID();
+			if ( ! $current_page_id ) {
+				return;
+			}
+
+			switch ( $slug ) {
+				case 'payment':
+					$payment_page_id = (int) $settings['payment_page_id'] ?? 0;
+					return $payment_page_id && $payment_page_id === $current_page_id;
+				case 'processing':
+					$processing_page_id = (int) $settings['processing_page_id'] ?? 0;
+					return $processing_page_id && $processing_page_id === $current_page_id;
+			}
 		}
 
 		/**
