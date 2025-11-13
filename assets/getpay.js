@@ -108,18 +108,7 @@ function getPaymentDescription() {
   return payment_description;
 }
 
-function loadGetPayScript(callback) {
-  if (window.GetPay) return callback();
-  const script = document.createElement("script");
-  script.src =
-    "https://minio.finpos.global/getpay-cdn/webcheckout/v5/bundle.js";
-  script.onload = callback;
-  script.onerror = () => console.error("Failed to load GetPay SDK");
-  document.head.appendChild(script);
-}
-
 function initiateGetPayPayment() {
-  console.log("getpay init");
   const paymentOptionWrapper = document.querySelector(
     ".tripzzy-payment-options-wrapper"
   );
@@ -133,20 +122,6 @@ function initiateGetPayPayment() {
     paymentButtonWrapper.innerHTML = buttonTemplate();
     paymentButtonWrapper.classList.remove("tripzzy-is-processing");
 
-    // Create new checkout div
-    // let getpayCardElement = document.createElement("div");
-    // getpayCardElement.id = "checkout";
-    // getpayCardElement.classList.add("tripzzy-getpay-payment-element");
-    // getpayCardElement.hidden = true;
-    // getpayCardElement.style.padding = "20px";
-    // getpayCardElement.style.boxShadow = "var(--tripzzy-box-shadow)";
-    // getpayCardElement.style.background = "#fff";
-    // getpayCardElement.style.borderRadius = "var(--tripzzy-rounded)";
-    // getpayCardElement.style.marginBottom = "var(--tripzzy-g)";
-    // paymentOptionWrapper.append(getpayCardElement);
-
-    // loadGetPayScript(() => {
-    // console.log("getpay loaded");
     let paymentBtn = paymentButtonWrapper.querySelector(
       "input[name='tripzzy_book_now']"
     );
@@ -173,6 +148,19 @@ function initiateGetPayPayment() {
 
       let response = validateCheckoutForm(true);
       if (response.validated) {
+        const formData = new FormData(formElement);
+        const formObject = Object.fromEntries(formData.entries());
+        TripzzyGetpaySafeStorage.set("tripzzyCheckoutForm", formObject);
+
+        const storedData = TripzzyGetpaySafeStorage.get("tripzzyCheckoutForm");
+        const isStored = null !== storedData;
+
+        if (!isStored) {
+          // In case of not saved due to configuration error like http over https.
+          displayErrorMessage("Checkout Data Not Found!");
+          paymentBtn.disabled = true;
+        }
+
         let amount = paymentButtonWrapper.getAttribute("data-total");
         let firstName = document.getElementById("billing-first-name")?.value;
         let lastName = document.getElementById("billing-last-name")?.value;
@@ -190,7 +178,17 @@ function initiateGetPayPayment() {
           opr_key: oprKey,
           ins_key: insKey,
           base_url: baseUrl,
+          business_name: businessName,
+          website_domain: websiteDomain,
+          payment_page_url: paymentPageURL,
+          processing_page_url: processingPageURL,
         } = getpay_payment;
+
+        if (!getpay_payment) {
+          displayErrorMessage("Configuration error.");
+          paymentBtn.disabled = true;
+        }
+
         paymentButtonWrapper.classList.add("tripzzy-is-processing");
         const options = {
           // user Info is optional. If provided, you can choose to prefill those information in checkout page
@@ -202,22 +200,22 @@ function initiateGetPayPayment() {
             zipcode,
             city,
             address,
-			  phoneNumber:''
+            phoneNumber: "",
           },
           papInfo: papInfo,
           oprKey: oprKey,
           insKey: "",
           clientRequestId: "CLIENT123",
-          websiteDomain: "https://getpay.wptripzzy.com", // static for now.
+          websiteDomain,
           price: parseFloat(amount),
-          businessName: "MAYA TRIPS PVT LTD", // your businessName with slogan to display in checkout page
+          businessName,
           imageUrl:
             "https://getpay.wptripzzy.com/wp-content/plugins/tripzzy-getpay-payment/assets/favicon.png", // company logo to display in checkout page
           currency: "NPR",
           // provided attributes with value true will autofill in checkout page
           prefill: {
-            name: false,
-            email: false,
+            name: true,
+            email: true,
             state: false,
             city: false,
             address: false,
@@ -231,8 +229,8 @@ function initiateGetPayPayment() {
           },
           // redirection callback url when payment is either success or fail
           callbackUrl: {
-            successUrl: "https://getpay.wptripzzy.com/tz-thank-you", // static for now
-            failUrl: "https://getpay.wptripzzy.com/tz-payment-failed", // static for now
+            successUrl: processingPageURL, // static for now
+            failUrl: processingPageURL, // static for now
           },
           // brand theme color to display in checkout page
           themeColor: "#5662FF",
@@ -250,7 +248,7 @@ margin-right: 10px;" src="https://getpay.wptripzzy.com/wp-content/plugins/tripzz
             paymentButtonWrapper.classList.add("tripzzy-is-processing");
             let p = confirm("cancel to see log and click ok to redirect");
             if (p) {
-              window.location.href = "https://getpay.wptripzzy.com/payment"; // static for now
+              window.location.href = paymentPageURL;
             } else {
               paymentButtonWrapper.classList.remove("tripzzy-is-processing");
             }
@@ -262,7 +260,7 @@ margin-right: 10px;" src="https://getpay.wptripzzy.com/wp-content/plugins/tripzz
           },
         };
         console.log("option before call ", options);
-		options.baseUrl = "https://uat-bank-getpay.nchl.com.np/ecom-web-checkout/v1/secure-merchant/transactions";
+        options.baseUrl = baseUrl;
 
         const getpay = new GetPay(options);
         getpay.initialize();
@@ -276,7 +274,6 @@ margin-right: 10px;" src="https://getpay.wptripzzy.com/wp-content/plugins/tripzz
         displayErrorMessage(response.message); // handle to display/hide error message.
       }
     };
-    // });
   } catch (e) {
     displayErrorMessage(e.message);
     // paymentButtonWrapper.classList.remove("tripzzy-is-processing");

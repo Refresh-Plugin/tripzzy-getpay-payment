@@ -66,6 +66,9 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 			// Add Settings Fields.
 			add_filter( 'tripzzy_filter_payment_gateways_args', array( $this, 'init_args' ) );
 
+			// Add Seeder Field To list Page in settings.
+			add_filter( 'tripzzy_filter_page_seeder', array( $this, 'add_page_in_settings' ) );
+
 			// Frontend.
 			add_action( 'wp_enqueue_scripts', array( $this, 'frontend_scripts' ), 100 );
 
@@ -101,58 +104,132 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 				'name'          => self::$payment_gateway,
 				'wrapper_class' => '',
 				'fields'        => array(
-					'enabled'       => array( // this key is for php side.
+					'enabled'            => array( // this key is for php side.
 						'name'  => 'enabled', // this name and its key must be identical.
 						'label' => __( 'Enabled' ),
 						'value' => true,
 					),
-					'description'   => array(
+					'description'        => array(
 						'name'  => 'description',
 						'label' => __( 'Description' ),
 						'type'  => 'textarea',
 						'value' => __( 'Complete your booking by paying with Getpay Payment.' ),
 					),
 					// Getpay Payment Key.
-					'pap_info'      => array(
-						'name'  => 'pap_info',
-						'type'  => 'text',
-						'label' => __( 'Pap Info' ),
-						'value' => '',
+					'business_name'      => array(
+						'name'        => 'business_name',
+						'type'        => 'text',
+						'label'       => __( 'Business Name' ),
+						'value'       => '',
+						'placeholder' => 'MAYA TRIPS PVT LTD',
+						'tooltip'     => 'Your Business Name',
 					),
-					'ins_key'       => array(
-						'name'  => 'ins_key',
-						'type'  => 'text',
-						'label' => __( 'Ins Key' ),
-						'value' => '',
+					'website_domain'     => array(
+						'name'        => 'website_domain',
+						'type'        => 'text',
+						'label'       => __( 'Website Domain' ),
+						'value'       => '',
+						'placeholder' => 'https://your-site.com',
+						'tooltip'     => 'Your Business Website URL',
 					),
-					'opr_key'       => array(
-						'name'  => 'opr_key',
-						'type'  => 'text',
-						'label' => __( 'Opr Key' ),
-						'value' => '',
+					'live_credentials'   => array(
+						'name'    => 'live_credentials',
+						'type'    => 'heading',
+						'label'   => __( 'Live Credentials' ),
+						'tooltip' => 'Add Your Live Credentials for real Transaction.',
+					),
+					'pap_info'           => array(
+						'name'    => 'pap_info',
+						'type'    => 'text',
+						'label'   => __( 'Pap Info' ),
+						'value'   => '',
+						'tooltip' => 'Pap Info Provided by GetPay.',
+					),
+					'opr_key'            => array(
+						'name'    => 'opr_key',
+						'type'    => 'text',
+						'label'   => __( 'Opr Key' ),
+						'value'   => '',
+						'tooltip' => 'Opr Key Provided by Getpay.',
+					),
+					'ins_key'            => array(
+						'name'    => 'ins_key',
+						'type'    => 'text',
+						'label'   => __( 'Ins Key' ),
+						'value'   => '',
+						'tooltip' => 'Ins Key Provided by Getpay. Leave empty.',
 					),
 
-					'test_pap_info' => array(
-						'name'  => 'test_pap_info',
-						'type'  => 'text',
-						'label' => __( 'Test Pap Info' ),
-						'value' => '',
+					'bundle_js_url'      => array(
+						'name'        => 'bundle_js_url',
+						'type'        => 'text',
+						'label'       => __( 'Bundle JS URL' ),
+						'value'       => '',
+						'placeholder' => 'https://minio.finpos.global/.../bundle.min.js',
+						'tooltip'     => 'Bundle URL Provided by GetPay.',
 					),
-					'test_ins_key'  => array(
-						'name'  => 'test_ins_key',
-						'type'  => 'text',
-						'label' => __( 'Test Ins Key' ),
-						'value' => '',
+					'base_url'           => array(
+						'name'        => 'base_url',
+						'type'        => 'text',
+						'label'       => __( 'Base URL' ),
+						'value'       => '',
+						'placeholder' => 'https://uat-bank-getpay.nchl.com.np/...',
+						'tooltip'     => 'Base URL Provided by GetPay.',
 					),
-					'test_opr_key'  => array(
-						'name'  => 'test_opr_key',
-						'type'  => 'text',
-						'label' => __( 'Test Opr Key' ),
-						'value' => '',
+					'test_credentials'   => array(
+						'name'    => 'test_credentials',
+						'type'    => 'heading',
+						'label'   => __( 'Test Credentials' ),
+						'tooltip' => 'Add Your Test Credentials for testing purpose.',
+					),
+					'test_pap_info'      => array(
+						'name'    => 'test_pap_info',
+						'type'    => 'text',
+						'label'   => __( 'Test Pap Info' ),
+						'value'   => '',
+						'tooltip' => 'Pap Info Provided by GetPay.',
+					),
+					'test_opr_key'       => array(
+						'name'    => 'test_opr_key',
+						'type'    => 'text',
+						'label'   => __( 'Test Opr Key' ),
+						'value'   => '',
+						'tooltip' => 'Opr Key Provided by Getpay.',
+					),
+					'test_ins_key'       => array(
+						'name'    => 'test_ins_key',
+						'type'    => 'text',
+						'label'   => __( 'Test Ins Key' ),
+						'value'   => '',
+						'tooltip' => 'Ins Key Provided by Getpay. Leave empty.',
+					),
+					'test_bundle_js_url' => array(
+						'name'        => 'test_bundle_js_url',
+						'type'        => 'text',
+						'label'       => __( 'Test Bundle JS URL' ),
+						'value'       => '',
+						'placeholder' => 'https://minio.finpos.global/.../bundle.min.js',
+						'tooltip'     => 'Bundle URL Provided by GetPay.',
+					),
+					'test_base_url'      => array(
+						'name'        => 'test_base_url',
+						'type'        => 'text',
+						'label'       => __( 'Test Base URL' ),
+						'value'       => '',
+						'placeholder' => 'https://uat-bank-getpay.nchl.com.np/...',
+						'tooltip'     => 'Test Base URL Provided by GetPay.',
 					),
 				),
 			);
 			return $args;
+		}
+
+		public function add_page_in_settings( $pages ) {
+			$getpay_pages = tripzzy_getpay_pages();
+			if ( ! empty( $getpay_pages ) ) {
+				$pages = array_merge( $pages, $getpay_pages );
+			}
+			return $pages;
 		}
 
 		/**
@@ -161,11 +238,32 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 		 * @return void
 		 */
 		public function frontend_scripts() {
-			$settings = Settings::get();
-			wp_register_script( 'tripzzy-getpay-bundle', 'https://minio.finpos.global/getpay-cdn/webcheckout/v5/bundle.js', array(), '1.0.0', true );
-			if ( Page::is( 'checkout' ) ) {
-				wp_enqueue_script( 'tripzzy-getpay-custom', self::$assets_url . 'getpay.js', array( 'tripzzy-getpay-bundle' ), '1.0.0', true );
-				wp_enqueue_style( 'tripzzy-getpay-custom', self::$assets_url . 'getpay.css', array(), '1.0.0' );
+			$settings        = Settings::get();
+			$data            = self::geteway_data();
+			$current_page_id = get_the_id();
+			if ( ! $current_page_id ) {
+				return;
+			}
+			if ( ! empty( $data ) ) {
+				$test_mode     = $data['test_mode'];
+				$config        = $data['config']; // Payment gateway configuration.
+				$bundle_js_url = $config['bundle_js_url'] ?? '';
+				if ( $test_mode ) {
+					$bundle_js_url = $config['test_bundle_js_url'] ?? '';
+				}
+
+				wp_register_script( 'tripzzy-getpay-bundle', $bundle_js_url, array(), '1.0.0', true );
+				wp_register_script( 'tripzzy-getpay-local-storage', self::$assets_url . 'local-storage.js', array(), '1.0.0', true );
+				if ( Page::is( 'checkout' ) ) {
+					wp_enqueue_script( 'tripzzy-getpay-custom', self::$assets_url . 'getpay.js', array( 'tripzzy-getpay-bundle', 'tripzzy-getpay-local-storage' ), '1.0.0', true );
+					wp_enqueue_style( 'tripzzy-getpay-custom', self::$assets_url . 'getpay.css', array(), '1.0.0' );
+				}
+
+				$payment_page_id    = $settings['payment_page_id'] ?? 0;
+				$processing_page_id = $settings['processing_page_id'] ?? 0;
+				if ( $payment_page_id ) {
+					wp_enqueue_script( 'tripzzy-getpay-bundle' );
+				}
 			}
 		}
 
@@ -190,23 +288,45 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 
 			$data = self::geteway_data();
 			if ( ! empty( $data ) ) {
-				$test_mode = $data['test_mode'];
-				$config    = $data['config']; // Payment gateway configuration.
+				$settings           = self::$settings;
+				$test_mode          = $data['test_mode'];
+				$config             = $data['config']; // Payment gateway configuration.
+				$payment_page_id    = $settings['payment_page_id'] ?? 0;
+				$processing_page_id = $settings['processing_page_id'] ?? 0;
 
-				$pap_info = $config['pap_info'] ?? '';
-				$ins_key  = $config['ins_key'] ?? '';
-				$opr_key  = $config['opr_key'] ?? '';
+				// General.
+				$business_name  = $config['business_name'] ?? 'Tripzzy';
+				$website_domain = $config['website_domain'] ?? 'Tripzzy';
+
+				// Specific.
+				$pap_info      = $config['pap_info'] ?? '';
+				$opr_key       = $config['opr_key'] ?? '';
+				$ins_key       = $config['ins_key'] ?? '';
+				$bundle_js_url = $config['bundle_js_url'] ?? '';
+				$base_url      = $config['base_url'] ?? '';
 				if ( $test_mode ) {
-					$pap_info = $config['test_pap_info'] ?? '';
-					$ins_key  = $config['test_ins_key'] ?? '';
-					$opr_key  = $config['test_opr_key'] ?? '';
+					$pap_info      = $config['test_pap_info'] ?? '';
+					$opr_key       = $config['test_opr_key'] ?? '';
+					$ins_key       = $config['test_ins_key'] ?? '';
+					$bundle_js_url = $config['test_bundle_js_url'] ?? '';
+					$base_url      = $config['test_base_url'] ?? '';
+
 				}
 
 				$localized['gateway']['getpay_payment'] = array(
-					'pap_info' => $pap_info,
-					'ins_key'  => $ins_key,
-					'opr_key'  => $opr_key,
+					'business_name'  => $business_name,
+					'website_domain' => $website_domain,
+					'pap_info'       => $pap_info,
+					'opr_key'        => $opr_key,
+					'ins_key'        => $ins_key,
+					'base_url'       => $base_url,
 				);
+				if ( $payment_page_id ) {
+					$localized['gateway']['getpay_payment']['payment_page_url'] = get_permalink( $payment_page_id );
+				}
+				if ( $processing_page_id ) {
+					$localized['gateway']['getpay_payment']['processing_page_url'] = get_permalink( $processing_page_id );
+				}
 
 				$localized['gateway']['getpay_payment']['thankyou_page_url'] = Page::get_url( 'thankyou' );
 				// $thankyou_page_url = add_query_arg( 'tripzzy_key', $data['tripzzy_nonce'], $thankyou_page_url );

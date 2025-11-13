@@ -35,31 +35,52 @@ add_action( 'plugins_loaded', 'getpay_payment_init' );
 add_filter(
 	'tripzzy_filter_default_settings',
 	function ( $default_settings ) {
-		$default_settings['payment_page_id'] = '';
+		$default_settings['payment_page_id']    = '';
+		$default_settings['processing_page_id'] = '';
 		return $default_settings;
 	}
 );
+
+function tripzzy_getpay_pages() {
+	$pages = array(
+		// Payment Page
+		array(
+			'post_name'      => _x( 'getpay-payment', 'Page slug', 'tripzzy-getpay-payment' ),
+			'post_title'     => _x( 'Payment', 'Page title', 'tripzzy-getpay-payment' ),
+			'post_content'   => '<div id="checkout"></div>',
+			'post_content_6' => '<!-- wp:html --><div id="checkout"></div><!-- /wp:html -->',
+			'settings_key'   => 'payment_page_id',
+			'title'          => __( 'GetPay Payment Page', 'tripzzy-getpay-payment' ),
+		),
+		// Payment Success.
+		array(
+			'post_name'      => _x( 'processing-booking', 'Page slug', 'tripzzy-getpay-payment' ),
+			'post_title'     => _x( 'Processing', 'Page title', 'tripzzy-getpay-payment' ),
+			'post_content'   => '<div id="checkout"></div>',
+			'post_content_6' => '<!-- wp:html --><div id="checkout"></div><!-- /wp:html -->',
+			'settings_key'   => 'processing_page_id',
+			'title'          => __( 'GetPay Thank You/Processing Page', 'tripzzy-getpay-payment' ),
+		),
+	);
+	return $pages;
+}
 register_activation_hook(
 	__FILE__,
 	function () {
-		$settings  = Settings::get();
-		$page_data = array(
-			'post_name'      => _x( 'payment', 'Page slug', 'tripzzy' ),
-			'post_title'     => _x( 'Payment', 'Page title', 'tripzzy' ),
-			'post_content'   => '[TRIPZZY_PAYMENT]',
-			'post_content_6' => '<!-- wp:html --><div id="checkout"></div><!-- /wp:html -->',
-			'settings_key'   => 'payment_page_id',
-			'title'          => __( 'Tripzzy Payment Page', 'tripzzy' ),
-		);
+		$settings = Settings::get();
 
-		$settings_key = $page_data['settings_key'];
-		$page_id      = isset( $settings[ $settings_key ] ) ? $settings[ $settings_key ] : 0;
+		$pages = tripzzy_getpay_pages();
+		foreach ( $pages as $page_data ) {
 
-		$new_page_id = PageSeeder::create( $page_data, $page_id ); // only return page id if post is created.
-		if ( $new_page_id > 0 ) {
-			$settings[ $settings_key ] = $new_page_id;
-			MetaHelpers::update_post_meta( $new_page_id, 'settings_key', $settings_key ); // To check Tripzzy created pages later.
-			Settings::update( $settings );
+			$settings_key = $page_data['settings_key'];
+			$page_id      = isset( $settings[ $settings_key ] ) ? $settings[ $settings_key ] : 0;
+
+			$new_page_id = PageSeeder::create( $page_data, $page_id ); // only return page id if post is created.
+			if ( $new_page_id > 0 ) {
+				$settings[ $settings_key ] = $new_page_id;
+				MetaHelpers::update_post_meta( $new_page_id, 'settings_key', $settings_key ); // To check Tripzzy created pages later.
+				Settings::update( $settings );
+			}
 		}
 	}
 );
