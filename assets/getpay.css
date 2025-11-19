@@ -1,9 +1,24 @@
-iframe.step-up-iframe{position: relative !important; min-height: 712px;}
-
-.tripzzy-getpay-payment-element .parent-div{
-    padding: 0 !important;
-    display: flex !important;
-}
-.tripzzy-getpay-payment-element .business-details-container{
-    display: none !important;
+iframe.step-up-iframe {
+    position: relative !important;
+    min-height: 712px;
+}
+
+.tripzzy-getpay-payment-element .parent-div {
+
+    padding: 0 !important;
+
+    display: flex !important;
+
+}
+
+.tripzzy-getpay-payment-element .business-details-container {
+
+    display: none !important;
+
+}
+
+/* Order Info UI in payment page. */
+.information-section .tz-col.tz-cols-5-lg {
+    width: 100%;
+    max-width: 100%
 }

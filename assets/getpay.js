@@ -169,6 +169,8 @@ function initiateGetPayPayment() {
         // let zipcode = document.getElementById("billing-postcode")?.value;
         let city = document.getElementById("billing-city")?.value;
         let address = document.getElementById("billing-address-1")?.value;
+        let phoneNumber = document.getElementById("billing-phone")?.value;
+
         let zipcode = 44600;
 
         const { gateway } = tripzzy || {};
@@ -181,7 +183,9 @@ function initiateGetPayPayment() {
           business_name: businessName,
           website_domain: websiteDomain,
           payment_page_url: paymentPageURL,
-          processing_page_url: processingPageURL,
+          success_page_url: successPageURL,
+          failed_page_url: failedPageURL,
+          order_information_ui: orderInformationUI,
         } = getpay_payment;
 
         if (!getpay_payment) {
@@ -189,23 +193,28 @@ function initiateGetPayPayment() {
           paymentBtn.disabled = true;
         }
 
+        if ("undefined" === typeof GetPay) {
+          displayErrorMessage("GetPay library not loaded");
+          paymentBtn.disabled = true;
+          return false;
+        }
+
         paymentButtonWrapper.classList.add("tripzzy-is-processing");
         const options = {
           // user Info is optional. If provided, you can choose to prefill those information in checkout page
           userInfo: {
-            name: sprintf("%s %s", firstName, lastName),
+            name: firstName + " " + lastName,
             email: billingEmail,
-            state,
+            state: state,
             country: "Nepal",
-            zipcode,
-            city,
-            address,
-            phoneNumber: "",
+            zipcode: zipcode,
+            city: city,
+            address: address,
+            phoneNumber: phoneNumber,
           },
           papInfo: papInfo,
           oprKey: oprKey,
           insKey: "",
-          clientRequestId: "CLIENT123",
           websiteDomain,
           price: parseFloat(amount),
           businessName,
@@ -214,8 +223,8 @@ function initiateGetPayPayment() {
           currency: "NPR",
           // provided attributes with value true will autofill in checkout page
           prefill: {
-            name: true,
-            email: true,
+            name: false,
+            email: false,
             state: false,
             city: false,
             address: false,
@@ -229,30 +238,16 @@ function initiateGetPayPayment() {
           },
           // redirection callback url when payment is either success or fail
           callbackUrl: {
-            successUrl: processingPageURL, // static for now
-            failUrl: processingPageURL, // static for now
+            successUrl: successPageURL,
+            failUrl: failedPageURL, // static for now
           },
           // brand theme color to display in checkout page
           themeColor: "#5662FF",
           // accept html with inline css to display UI in checkout page
-          orderInformationUI: `<div style="font-family:Arial;"><h3>Order Information</h3><div class="item" style="
-margin-bottom: 20px;">
-<div class="item">
-<img style=" max-width: 50px;
-margin-right: 10px;" src="https://getpay.wptripzzy.com/wp-content/plugins/tripzzy/assets/images/logo.svg" alt="image">
-<p>Cup Set</p>
-<span>Rs 450</span>
-</div></div>`,
+          orderInformationUI,
           onSuccess: (options) => {
-            console.log("success", options);
             paymentButtonWrapper.classList.add("tripzzy-is-processing");
-            let p = confirm("cancel to see log and click ok to redirect");
-            if (p) {
-              window.location.href = paymentPageURL;
-            } else {
-              paymentButtonWrapper.classList.remove("tripzzy-is-processing");
-            }
-            // formElement.submit(); // Form Submitted on payment complete only.
+            window.location.replace(paymentPageURL);
           },
           onError: (response) => {
             paymentButtonWrapper.classList.remove("tripzzy-is-processing");
@@ -284,6 +279,12 @@ margin-right: 10px;" src="https://getpay.wptripzzy.com/wp-content/plugins/tripzz
 }
 
 initiateGetPayPayment();
+
+// const disableUnloadWarning = () => {
+//   window.onbeforeunload = null;
+
+//   jQuery(window).off("beforeunload");
+// };
 
 // Payment option Button click event.
 document.addEventListener("click", function (event) {

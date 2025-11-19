@@ -19,6 +19,7 @@ use Tripzzy\Core\Traits\GatewayTrait;
 use Tripzzy\Core\Cart;
 use Tripzzy\Core\Bookings;
 use Tripzzy\Core\Forms\CheckoutForm;
+use Tripzzy\Core\Template;
 
 if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 	/**
@@ -78,24 +79,10 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 			// Add Checkout div in checkout page.
 			add_action( 'tripzzy_checkout_after_submit_button', array( $this, 'add_checkout_div' ) );
 
-			// Page Template.
-			add_filter( 'template_include', array( $this, 'template_include' ) );
 			// Add Query vers for processing/success page.
 			add_filter( 'query_vars', array( $this, 'query_vars' ) );
 
-			add_shortcode(
-				'TRIPZZY_PAYMENT',
-				function () {
-					ob_start();
-					wp_enqueue_script( 'tripzzy-getpay-bundle' );
-					?>
-					<div id="checkout"></div>
-					<?php
-					$content = ob_get_contents();
-					ob_end_clean();
-					return $content;
-				}
-			);
+			add_shortcode( 'TRIPZZY_GETPAY_SUCCESS_PAGE', array( $this, 'getpay_success_page_shortcode' ) );
 		}
 
 		/**
@@ -243,12 +230,9 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 		 * @return void
 		 */
 		public function frontend_scripts() {
-			$settings        = Settings::get();
-			$data            = self::geteway_data();
-			$current_page_id = get_the_id();
-			if ( ! $current_page_id ) {
-				return;
-			}
+			$settings = Settings::get();
+			$data     = self::geteway_data();
+
 			if ( ! empty( $data ) ) {
 				$test_mode     = $data['test_mode'];
 				$config        = $data['config']; // Payment gateway configuration.
@@ -259,15 +243,21 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 
 				wp_register_script( 'tripzzy-getpay-bundle', $bundle_js_url, array(), '1.0.0', true );
 				wp_register_script( 'tripzzy-getpay-local-storage', self::$assets_url . 'local-storage.js', array(), '1.0.0', true );
-				if ( Page::is( 'checkout' ) ) {
-					wp_enqueue_script( 'tripzzy-getpay-custom', self::$assets_url . 'getpay.js', array( 'tripzzy-getpay-bundle', 'tripzzy-getpay-local-storage' ), '1.0.0', true );
-					wp_enqueue_style( 'tripzzy-getpay-custom', self::$assets_url . 'getpay.css', array(), '1.0.0' );
-				}
+				wp_register_script( 'tripzzy-getpay-custom', self::$assets_url . 'getpay.js', array( 'tripzzy-getpay-bundle', 'tripzzy-getpay-local-storage' ), '1.0.0', true );
+				wp_register_style( 'tripzzy-getpay-custom', self::$assets_url . 'getpay.css', array(), '1.0.0' );
 
-				$payment_page_id    = (int) $settings['payment_page_id'] ?? 0;
-				$processing_page_id = (int) $settings['processing_page_id'] ?? 0;
-				if ( $payment_page_id === $current_page_id ) {
-					wp_enqueue_script( 'tripzzy-getpay-bundle' );
+				if ( $this->is_page( 'payment' ) || $this->is_page( 'success' ) ) {
+
+					if ( $this->is_page( 'payment' ) ) {
+						wp_enqueue_script( 'tripzzy-getpay-bundle' );
+						wp_enqueue_script( 'tripzzy-getpay-preloader', self::$assets_url . 'getpay-preloader.js', array(), '1.0.0', true );
+					}
+
+					wp_enqueue_style( 'tripzzy-getpay-preloader', self::$assets_url . 'getpay-preloader.css', array(), '1.0.0' );
+					wp_enqueue_style( 'tripzzy-getpay-custom' );
+
+					add_action( 'wp_footer', array( $this, 'add_loader' ) );
+
 				}
 			}
 		}
@@ -278,24 +268,30 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 		 * @return void
 		 */
 		public function add_checkout_div() {
+			wp_enqueue_script( 'tripzzy-getpay-custom' );
+			wp_enqueue_style( 'tripzzy-getpay-custom' );
 			?>
 			<div id="checkout" hidden></div>
 			<?php
 		}
 
 		/**
-		 * Add Template For Page.
+		 * Add Loader for payment and success page.
 		 *
 		 * @return void
 		 */
-		public function template_include( $template ) {
-			if ( $this->is_page( 'processing' ) ) {
-				$page_template = $this->get_template_file( 'processing.php' );
-				if ( $page_template ) {
-					return $page_template;
-				}
+		public function add_loader() {
+			$loading_text = 'Loading secure payment...';
+			if ( $this->is_page( 'success' ) ) {
+				$loading_text = 'Processing your bookings...';
 			}
-			return $template;
+
+			?>
+				<div id="getpay-preloader">
+					<img src="<?php echo esc_url( self::$assets_url . 'logo.webp' ); ?>" alt="GetPay" class="getpay-logo">
+					<div id="loading-text"><?php echo esc_html( $loading_text ); ?></div>
+				</div>
+			<?php
 		}
 
 		public function get_template_file( $template_name, $args = array() ) {
@@ -344,11 +340,14 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 
 			switch ( $slug ) {
 				case 'payment':
-					$payment_page_id = (int) $settings['payment_page_id'] ?? 0;
-					return $payment_page_id && $payment_page_id === $current_page_id;
-				case 'processing':
-					$processing_page_id = (int) $settings['processing_page_id'] ?? 0;
-					return $processing_page_id && $processing_page_id === $current_page_id;
+					$page_id = (int) $settings['getpay_payment_page_id'] ?? 0;
+					return $page_id && $page_id === $current_page_id;
+				case 'success':
+					$page_id = (int) $settings['getpay_success_page_id'] ?? 0;
+					return $page_id && $page_id === $current_page_id;
+				case 'failed':
+					$page_id = (int) $settings['getpay_failed_page_id'] ?? 0;
+					return $page_id && $page_id === $current_page_id;
 			}
 		}
 
@@ -362,11 +361,12 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 
 			$data = self::geteway_data();
 			if ( ! empty( $data ) ) {
-				$settings           = self::$settings;
-				$test_mode          = $data['test_mode'];
-				$config             = $data['config']; // Payment gateway configuration.
-				$payment_page_id    = $settings['payment_page_id'] ?? 0;
-				$processing_page_id = $settings['processing_page_id'] ?? 0;
+				$settings        = self::$settings;
+				$test_mode       = $data['test_mode'];
+				$config          = $data['config']; // Payment gateway configuration.
+				$payment_page_id = $settings['getpay_payment_page_id'] ?? 0;
+				$success_page_id = $settings['getpay_success_page_id'] ?? 0;
+				$failed_page_id  = $settings['getpay_failed_page_id'] ?? 0;
 
 				// General.
 				$business_name  = $config['business_name'] ?? 'Tripzzy';
@@ -398,17 +398,63 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 				if ( $payment_page_id ) {
 					$localized['gateway']['getpay_payment']['payment_page_url'] = get_permalink( $payment_page_id );
 				}
-				if ( $processing_page_id ) {
-					$localized['gateway']['getpay_payment']['processing_page_url'] = get_permalink( $processing_page_id );
+				if ( $success_page_id ) {
+					$localized['gateway']['getpay_payment']['success_page_url'] = get_permalink( $success_page_id );
 				}
+				if ( $failed_page_id ) {
+					$localized['gateway']['getpay_payment']['failed_page_url'] = get_permalink( $failed_page_id );
+				}
+				ob_start();
 
-				$localized['gateway']['getpay_payment']['thankyou_page_url'] = Page::get_url( 'thankyou' );
-				// $thankyou_page_url = add_query_arg( 'tripzzy_key', $data['tripzzy_nonce'], $thankyou_page_url );
-				// $thankyou_page_url = add_query_arg( 'booking_id', $booking_id, $thankyou_page_url );
-				// $thankyou_page_url = apply_filters( 'tripzzy_filter_thankyou_page_url', $thankyou_page_url );
+				Template::get_template_part( 'layouts/default/partials/mini', 'cart' );
+				$order_information_ui = ob_get_contents();
+				ob_end_clean();
+				$localized['gateway']['getpay_payment']['order_information_ui'] = $order_information_ui;
+
 			}
 
 			return $localized;
+		}
+
+		public function getpay_success_page_shortcode() {
+			wp_enqueue_script( 'tripzzy-getpay-redirect-success', self::$assets_url . 'getpay-redirect-success.js', array(), '1.0.0', true );
+
+			$token = sanitize_text_field( wp_unslash( get_query_var( 'token' ) ) );
+
+			if ( ! $token ) {
+				return;
+			}
+
+			$settings    = Settings::get();
+			$test_mode   = (bool) ( $settings['test_mode'] ?? false );
+			$getpay_data = $settings['payment_gateways']['getpay_payment'] ?? array();
+
+			if ( ! $getpay_data || ! is_array( $getpay_data ) ) {
+				return;
+			}
+
+			$pap_info = isset( $getpay_data['pap_info'] ) ? $getpay_data['pap_info'] : '';
+			$base_url = isset( $getpay_data['base_url'] ) ? $getpay_data['base_url'] : '';
+			if ( $test_mode ) {
+				$pap_info = isset( $getpay_data['test_pap_info'] ) ? $getpay_data['test_pap_info'] : '';
+				$base_url = isset( $getpay_data['test_base_url'] ) ? $getpay_data['test_base_url'] : '';
+			}
+
+			if ( empty( $pap_info ) || empty( $base_url ) ) {
+
+				return;
+
+			}
+
+			$transaction_id = tripzzy_get_transaction_id_by_token( $token );
+
+			if ( ! $transaction_id ) {
+				return;
+			}
+
+			$response = tripzzy_check_transaction_status( $transaction_id, $pap_info, $base_url );
+
+			return '';
 		}
 	}
 }

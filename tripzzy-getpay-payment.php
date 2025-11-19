@@ -36,31 +36,46 @@ add_action( 'plugins_loaded', 'getpay_payment_init' );
 add_filter(
 	'tripzzy_filter_default_settings',
 	function ( $default_settings ) {
-		$default_settings['payment_page_id']    = '';
-		$default_settings['processing_page_id'] = '';
+		$default_settings['getpay_payment_page_id'] = '';
+		$default_settings['getpay_success_page_id'] = '';
+		$default_settings['getpay_failed_page_id']  = '';
 		return $default_settings;
 	}
 );
 
+/**
+ * Additional Pages required for Getpay Payment.
+ *
+ * @return array
+ */
 function tripzzy_getpay_pages() {
 	$pages = array(
-		// Payment Page
+		// Payment Page.
 		array(
 			'post_name'      => _x( 'getpay-payment', 'Page slug', 'tripzzy-getpay-payment' ),
 			'post_title'     => _x( 'Payment', 'Page title', 'tripzzy-getpay-payment' ),
 			'post_content'   => '<div id="checkout"></div>',
 			'post_content_6' => '<!-- wp:html --><div id="checkout"></div><!-- /wp:html -->',
-			'settings_key'   => 'payment_page_id',
-			'title'          => __( 'Tripzzy GetPay Payment Page', 'tripzzy-getpay-payment' ),
+			'settings_key'   => 'getpay_payment_page_id',
+			'title'          => __( 'Tz GetPay Payment', 'tripzzy-getpay-payment' ),
 		),
 		// Payment Success.
 		array(
-			'post_name'      => _x( 'processing-booking', 'Page slug', 'tripzzy-getpay-payment' ),
-			'post_title'     => _x( 'Processing', 'Page title', 'tripzzy-getpay-payment' ),
-			'post_content'   => '<div id="checkout"></div>',
-			'post_content_6' => '<!-- wp:html --><div id="checkout"></div><!-- /wp:html -->',
-			'settings_key'   => 'processing_page_id',
-			'title'          => __( 'Tripzzy GetPay Processing Page', 'tripzzy-getpay-payment' ),
+			'post_name'      => _x( 'payment-success', 'Page slug', 'tripzzy-getpay-payment' ),
+			'post_title'     => _x( 'Payment Success', 'Page title', 'tripzzy-getpay-payment' ),
+			'post_content'   => '[TRIPZZY_GETPAY_SUCCESS_PAGE]',
+			'post_content_6' => '<!-- wp:shortcode -->[TRIPZZY_GETPAY_SUCCESS_PAGE]<!-- /wp:shortcode -->',
+			'settings_key'   => 'getpay_success_page_id',
+			'title'          => __( 'Tz GetPay Success', 'tripzzy-getpay-payment' ),
+		),
+		// Payment Failed.
+		array(
+			'post_name'      => _x( 'payment-failed', 'Page slug', 'tripzzy-getpay-payment' ),
+			'post_title'     => _x( 'Payment Failed', 'Page title', 'tripzzy-getpay-payment' ),
+			'post_content'   => '<div id="payment-failed"><h2>Payment Failed</h2><p>Unfortunately, your payment could not be processed. Please try again or contact support if the problem persists.</p></div>',
+			'post_content_6' => '<!-- wp:html --><div id="payment-failed"><h2>Payment Failed</h2><p>Unfortunately, your payment could not be processed. Please try again or contact support if the problem persists.</p></div><!-- /wp:html -->',
+			'settings_key'   => 'getpay_failed_page_id',
+			'title'          => __( 'Tz GetPay Failed', 'tripzzy-getpay-payment' ),
 		),
 	);
 	return $pages;
@@ -96,6 +111,7 @@ function getpay_payment_init() {
 		return;
 	}
 	require_once 'PaymentGateway/GetpayPayment.php';
+	require_once 'PaymentGateway/GetpayFunctions.php';
 
 	add_action(
 		'init',
