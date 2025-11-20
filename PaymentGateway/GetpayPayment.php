@@ -83,6 +83,54 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 			add_filter( 'query_vars', array( $this, 'query_vars' ) );
 
 			add_shortcode( 'TRIPZZY_GETPAY_SUCCESS_PAGE', array( $this, 'getpay_success_page_shortcode' ) );
+
+			// add_filter(
+			// 'tripzzy_filter_use_system_default_note',
+			// function ( $note, $data ) {
+			// $payment_mode = $data['payment_mode'] ?? '';
+			// if ( 'getpay_payment' === $payment_mode ) {
+			// return false;
+			// }
+			// return $note;
+			// },
+			// 10,
+			// 2
+			// );
+			// Update booking Status and note as per Getpay Response.
+			add_filter(
+				'tripzzy_filter_booking_status_after_payment',
+				function ( $booking_status, $data ) {
+					$has_payment  = (bool) ( $data['payment_details'] ?? false );
+					$payment_mode = $data['payment_mode'] ?? '';
+					if ( $has_payment && 'getpay_payment' === $payment_mode ) {
+						$payment_details = json_decode( wp_unslash( $data['payment_details'] ), true );
+						$booking_status  = $payment_details['booking_status'] ?? 'pending';
+					}
+					return $booking_status;
+				},
+				10,
+				2
+			);
+
+			add_action(
+				'tripzzy_after_booking',
+				function ( $booking_id, $data ) {
+					$has_payment  = (bool) ( $data['payment_details'] ?? false );
+					$payment_mode = $data['payment_mode'] ?? '';
+					if ( $has_payment && 'getpay_payment' === $payment_mode ) {
+						$payment_details = json_decode( wp_unslash( $data['payment_details'] ), true );
+						$note            = $payment_details['booking_note'] ?? '';
+						if ( $note ) {
+							Bookings::add_note( $booking_id, $note );
+						}
+						$transaction_id = $payment_details['transaction_id'] ?? '';
+						MetaHelpers::update_post_meta( $booking_id, 'getpay_transaction_id', $transaction_id );
+
+					}
+				},
+				15,
+				2
+			);
 		}
 
 		/**
@@ -216,6 +264,12 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 			return $args;
 		}
 
+		/**
+		 * Add GetPay Pages for Tripzzy.
+		 *
+		 * @param array $pages List of Tripzzy Pages.
+		 * @return array
+		 */
 		public function add_page_in_settings( $pages ) {
 			$getpay_pages = tripzzy_getpay_pages();
 			if ( ! empty( $getpay_pages ) ) {
@@ -294,30 +348,12 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 			<?php
 		}
 
-		public function get_template_file( $template_name, $args = array() ) {
-			$template_path = apply_filters( 'tripzzy_filter_getpay_template_path', 'tripzzy-getpay-payment/' );
-			$default_path  = sprintf( '%1$stemplates/', TRIPZZY_GETPAY_ABSPATH );
-
-			// Look templates in theme first.
-			$template = locate_template(
-				array(
-					trailingslashit( $template_path ) . $template_name,
-					$template_name,
-				),
-				false,
-				true,
-				$args
-			);
-
-			if ( ! $template ) { // Load from the plugin if the file is not in the theme.
-				$template = $default_path . $template_name;
-			}
-			if ( file_exists( $template ) ) {
-				return $template;
-			}
-			return false;
-		}
-
+		/**
+		 * Add Query var support for payment success/fail page.
+		 *
+		 * @param array $qvars List of supported/available query vars.
+		 * @return array
+		 */
 		public function query_vars( $qvars ) {
 			$qvars[] = 'token';
 			return $qvars;
@@ -384,7 +420,6 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 					$ins_key       = $config['test_ins_key'] ?? '';
 					$bundle_js_url = $config['test_bundle_js_url'] ?? '';
 					$base_url      = $config['test_base_url'] ?? '';
-
 				}
 
 				$localized['gateway']['getpay_payment'] = array(
@@ -416,8 +451,13 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 			return $localized;
 		}
 
+		/**
+		 * Shortcode Callback for Payment Success Page.
+		 *
+		 * @return void
+		 */
 		public function getpay_success_page_shortcode() {
-			wp_enqueue_script( 'tripzzy-getpay-redirect-success', self::$assets_url . 'getpay-redirect-success.js', array(), '1.0.0', true );
+			wp_enqueue_script( 'tripzzy-getpay-redirect-success', self::$assets_url . 'getpay-redirect-success.js', array( 'tripzzy-getpay-local-storage' ), '1.0.0', true );
 
 			$token = sanitize_text_field( wp_unslash( get_query_var( 'token' ) ) );
 
@@ -446,13 +486,65 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 
 			}
 
-			$transaction_id = tripzzy_get_transaction_id_by_token( $token );
+			$transaction_id = tripzzy_getpay_get_transaction_id_by_token( $token );
 
 			if ( ! $transaction_id ) {
 				return;
 			}
 
-			$response = tripzzy_check_transaction_status( $transaction_id, $pap_info, $base_url );
+			if ( tripzzy_getpay_check_booking_exists_by_transaction_id( $transaction_id ) ) {
+				return;
+			}
+
+			$response = tripzzy_getpay_check_transaction_status( $transaction_id, $pap_info, $base_url );
+			if ( isset( $response['status'] ) && 0 === $response['status'] && isset( $response['data']['status'] ) ) {
+
+				$status            = $response['data']['status'];
+				$normalized_status = strtolower( trim( $status ) );
+
+				$booking_note   = '';
+				$booking_status = 'pending';
+				if ( 'success' === $normalized_status || 'completed' === $normalized_status || 'paid' === $normalized_status ) {
+
+					$booking_status = 'booked';
+					$booking_note   = 'GetPay payment successful. Transaction ID: ' . $transaction_id;
+
+				} elseif ( 'pending' === $normalized_status || 'processing' === $normalized_status ) {
+
+					$booking_note = 'GetPay payment pending. Transaction ID: ' . $transaction_id;
+
+				} elseif ( 'cancelled' === $normalized_status || 'canceled' === $normalized_status ) {
+
+					$booking_status = 'canceled';
+					$booking_note   = 'GetPay payment cancelled. Transaction ID: ' . $transaction_id;
+
+				} elseif ( 'failed' === $normalized_status || 'failure' === $normalized_status || 'error' === $normalized_status ) {
+
+					$booking_status = 'failed';
+					$booking_note   = 'GetPay payment failed. Transaction ID: ' . $transaction_id;
+
+				} else {
+
+					$booking_note = 'GetPay payment status unknown: "' . $status . '". Transaction ID: ' . $transaction_id . '. Please verify manually.';
+
+				}
+				ob_start();
+
+				$getpay_response                   = $response;
+				$getpay_response['transaction_id'] = $transaction_id;
+				$getpay_response['booking_status'] = $booking_status;
+				$getpay_response['booking_note']   = $booking_note;
+
+				?>
+				<form name="tripzzy_checkout" id="tripzzy-checkout-form" method="POST">
+					<input type="hidden" name="getpay_response" id="getpay-response" value="<?php echo esc_attr( wp_json_encode( $getpay_response ) ); ?>" />
+				<form>
+				<?php
+				$content = ob_get_contents();
+				ob_end_clean();
+				return $content;
+
+			}
 
 			return '';
 		}

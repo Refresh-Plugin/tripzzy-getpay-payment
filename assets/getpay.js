@@ -254,7 +254,6 @@ function initiateGetPayPayment() {
             displayErrorMessage(response.error); // handle to display/hide error message.
           },
         };
-        console.log("option before call ", options);
         options.baseUrl = baseUrl;
 
         const getpay = new GetPay(options);
