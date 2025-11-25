@@ -520,8 +520,8 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 
 				} elseif ( 'failed' === $normalized_status || 'failure' === $normalized_status || 'error' === $normalized_status ) {
 
-					$booking_status = 'failed';
-					$booking_note   = 'GetPay payment failed. Transaction ID: ' . $transaction_id;
+					// $booking_status = 'failed';
+					$booking_note = 'GetPay payment failed. Transaction ID: ' . $transaction_id;
 
 				} else {
 
