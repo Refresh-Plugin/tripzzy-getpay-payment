@@ -444,6 +444,7 @@ if ( ! class_exists( 'Tripzzy\PaymentGateway\GetpayPayment' ) ) {
 				Template::get_template_part( 'layouts/default/partials/mini', 'cart' );
 				$order_information_ui = ob_get_contents();
 				ob_end_clean();
+				$order_information_ui = preg_replace('/<button\b[^>]*>[\s\S]*?<\/button>/i', '', $order_information_ui);
 				$localized['gateway']['getpay_payment']['order_information_ui'] = $order_information_ui;
 
 			}
